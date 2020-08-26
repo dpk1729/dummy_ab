@@ -1,30 +1,37 @@
-jobs    = Channel{Int}(32)
-results = Channel{Tuple}(32)
+using DataFrames
+
+df = DataFrame(a = collect(1:64), b= collect(65:128))
+
+jobs    = Channel{DataFrameRow}(32)
+results = Channel{Tuple{DataFrameRow{DataFrame,DataFrames.Index},Float64}}(32)
 
 
 function do_work(jobs, results)
-   for job_id in jobs
+   while isready(jobs)
+       job_id = take!(jobs)
        exec_time = rand()
-       sleep(exec_time)
+       # sleep(exec_time)
        put!(results, (job_id, exec_time))
+
    end
 end
 
 function make_jobs(n)
    for i in 1:n
-       put!(jobs, i)
+       put!(jobs, df[i,:])
+       do_work(jobs, results)
    end
 end;
 
-n = 12;
+n = 32;
 
 make_jobs(n)
 
-do_work(jobs, results)
+
 
 @elapsed while n > 0
-   job_id, exec_time, where = take!(results)
+   job_id, exec_time = take!(results)
    global n
-   println("$job_id finished in $(round(exec_time;digits=2)) seconds on worker $where")
+   println("$job_id finished in $(round(exec_time;digits=2)) seconds")
    n = n - 1
 end
