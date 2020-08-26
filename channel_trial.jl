@@ -1,9 +1,11 @@
-using DataFrames
+using DataFrames, Distributed
+
+addprocs(4)
 
 df = DataFrame(a = collect(1:64), b= collect(65:128))
 
-jobs    = Channel{DataFrameRow}(32)
-results = Channel{Tuple{DataFrameRow{DataFrame,DataFrames.Index},Float64}}(32)
+jobs    = RemoteChannel(()->Channel{DataFrameRow}(32))
+results = RemoteChannel(()->Channel{Tuple{DataFrameRow{DataFrame,DataFrames.Index},Float64}}(32))
 
 
 function do_work(jobs, results)
@@ -27,6 +29,9 @@ n = 32;
 
 make_jobs(n)
 
+for p in workers() # Start tasks on the workers to process requests in parallel.
+   @async remote_do(do_work, jobs, results) # Similar to remotecall.
+end
 
 
 @elapsed while n > 0
